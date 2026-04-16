@@ -1,0 +1,81 @@
+# ==================== QQ群相册配置 ====================
+qq:
+  # 群相册配置
+  group:
+    group_id: ""                      # 班级QQ群号(必填)
+    album_id: ""                       # 目标相册ID(留空则扫描全部)
+    cookies_file: "data/qq_cookies.txt"  # QQ登录Cookie文件路径
+
+  # 个人相册配置(可选,用于上传筛选后照片)
+  personal:
+    enabled: false                     # 是否启用自动上传
+    album_prefix: "{year}年{month}月宝宝照片"
+    visibility: "self_only"            # self_only / family
+
+# ==================== 人脸识别配置（可插拔） ====================
+face_recognition:
+  # 核心切换开关: 只需改这一行即可更换提供商
+  provider: "tencent_cloud"
+  # 可选值:
+  #   "tencent_cloud"     - 腾讯云人脸识别 (推荐,准确率99%+,1000次/月免费)
+  #   "baidu"             - 百度AI人脸识别 (免费额度大,QPS限制内免费)
+  #   "insight_face_local"- InsightFace本地模型 (完全离线,无网络依赖)
+
+  # 提供商A: 腾讯云
+  tencent_cloud:
+    secret_id: "${TENCENT_SECRET_ID}"
+    secret_key: "${TENCENT_SECRET_KEY}"
+    region: "ap-guangzhou"
+    group_id: "baby_photos_group"
+
+  # 提供商B: 百度AI
+  baidu:
+    app_id: "${BAIDU_APP_ID}"
+    api_key: "${BAIDU_API_KEY}"
+    secret_key: "${BAIDU_SECRET_KEY}"
+    group_id: "baby_photos_group"
+
+  # 提供商C: InsightFace 本地模型(离线)
+  insight_face_local:
+    model_name: "buffalo_l"
+    device: "cpu"
+    model_cache_dir: "data/models"
+    confidence_threshold: 0.80
+    use_faiss: false
+
+  # 目标人物配置(所有提供商共用)
+  targets:
+    - name: "宝贝女儿"
+      reference_photos_dir: "config/reference_photos/daughter/"
+      min_confidence: 0.80
+      enabled: true
+
+# ==================== 存储配置 ====================
+storage:
+  root_directory: "./output"           # 照片存储根目录
+  directory_format: "{root}/{year}/{month_num}_{month_name}/{date}"
+  filename_format: "{date}_{seq:04d}_qqgroup.{ext}"
+  retain_original_filename: true
+
+# ==================== 调度配置 ====================
+scheduler:
+  cron_expression: "0 */30 * * * *"   # 每30分钟执行一次
+  startup_scan: true                  # 启动时全量扫描一次
+  scan_days_back: 7                   # 启动回溯天数
+
+# ==================== 日志配置 ====================
+logging:
+  level: "INFO"                       # DEBUG / INFO / WARN / ERROR
+  directory: "logs"
+  max_file_size_mb: 50
+  retention_days: 90
+
+# ==================== 通知配置(可选) ====================
+notification:
+  enabled: false
+  type: "wechat"
+  wechat_webhook: ""
+  notify_on_new_photo: true
+  notify_on_error: true
+  daily_summary: true
+  summary_time: "21:00"

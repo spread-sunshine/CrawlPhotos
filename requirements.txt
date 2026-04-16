@@ -1,0 +1,19 @@
+# Baby Photos Auto-Filter Tool - Dependencies
+
+# Core
+pyyaml>=6.0,<7.0
+aiohttp>=3.9,<4.0
+apscheduler>=3.10,<4.0
+
+# Face Recognition Providers (install as needed)
+# Tencent Cloud: pip install tencentcloud-sdk-python
+# Baidu AI: pip install baidu-aip
+# InsightFace: pip install insightface onnxruntime-gpu (or onnxruntime)
+
+# Image Processing
+Pillow>=10.0,<11.0
+
+# Optional / Future
+# fastapi>=0.100,<1.0
+# uvicorn>=0.24,<1.0
+# watchdog>=3.0,<4.0

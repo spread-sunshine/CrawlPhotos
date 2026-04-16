@@ -1,0 +1,26 @@
+
+*.py[cod]
+*$py.class
+
+# Centralized bytecode cache (if using PYTHONPYCACHEPREFIX)
+.py_cache/
+
+logs/
+*.log
+
+# Environment
+.env
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/*.json
+!.vscode/settings.json
+
+# Data dirs
+data/
+output/
