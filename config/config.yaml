@@ -74,7 +74,15 @@ logging:
 notification:
   enabled: false
   type: "wechat"
-  wechat_webhook: ""
+  wechat:
+    # WeChat Official Account (MP) credentials
+    app_id: "${WECHAT_APP_ID}"           # 公众号AppID
+    app_secret: "${WECHAT_APP_SECRET}"   # 公众号AppSecret
+    # Template message IDs (from MP admin console)
+    template_id_new_photo: ""            # 新照片发现模板消息ID
+    template_id_error: ""                # 异常告警模板消息ID
+    template_id_summary: ""              # 每日汇总报告模板消息ID
+    receiver_openid: ""                  # 接收者OpenID
   notify_on_new_photo: true
   notify_on_error: true
   daily_summary: true
