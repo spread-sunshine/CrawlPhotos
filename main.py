@@ -81,6 +81,11 @@ Examples:
         action="store_true",
         help="Show system status and recent run history.",
     )
+    mode_group.add_argument(
+        "--setup",
+        action="store_true",
+        help="Run interactive configuration wizard.",
+    )
 
     parser.add_argument(
         "--days",
@@ -336,6 +341,13 @@ async def cmd_status(db: Database) -> None:
 def main() -> None:
     """Application entry point."""
     args = parse_args()
+
+    # Setup wizard mode (no DB needed)
+    if args.setup:
+        from app.config.setup_wizard import run_setup_wizard
+        config_path = Path(args.config) if args.config else None
+        run_setup_wizard(str(config_path) if config_path else None)
+        return
 
     # Initialize database (always needed)
     db = Database()

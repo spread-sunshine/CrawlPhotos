@@ -10,7 +10,7 @@ APIs used:
     4. CreatePerson    - Add reference photos to group
 
 Dependencies:
-    pip install tencentcloud-sdk-python
+    pip install tencentcloud-sdk-python-iai
 
 Config (from config.yaml):
     face_recognition.tencent_cloud:
@@ -72,10 +72,10 @@ class TencentCloudProvider(IFaceRecognizer):
 
     def __init__(
         self,
-        secret_id: str = "",
-        secret_key: str = "",
-        region: str = "ap-guangzhou",
-        group_id: str = "baby_photos_group",
+        secret_id: str="",
+        secret_key: str="",
+        region: str="ap-guangzhou",
+        group_id: str="baby_photos_group",
         **kwargs: Any,
     ) -> None:
         if not TENCENT_SDK_AVAILABLE:
@@ -256,7 +256,7 @@ class TencentCloudProvider(IFaceRecognizer):
             return {
                 "healthy": True,
                 "latency_ms": latency,
-                "quota_remaining": -1,
+                "quota_remaining":-1,
                 "message": "Tencent Cloud API reachable",
             }
         except Exception as exc:
@@ -272,7 +272,7 @@ class TencentCloudProvider(IFaceRecognizer):
     async def detect_faces(
         self,
         image_path: str,
-        max_faces: int = 10,
+        max_faces: int=10,
     ) -> List[FaceDetection]:
         """Detect all faces in an image."""
         img_base64 = self._encode_image(image_path)
@@ -317,7 +317,7 @@ class TencentCloudProvider(IFaceRecognizer):
     async def recognize(
         self,
         image_path: str,
-        target_names: Optional[List[str]] = None,
+        target_names: Optional[List[str]]=None,
     ) -> RecognitionResult:
         """
         Detect faces and search for target matches.
@@ -610,8 +610,8 @@ class TencentCloudProvider(IFaceRecognizer):
     async def batch_recognize(
         self,
         image_paths: List[str],
-        target_names: Optional[List[str]] = None,
-        concurrency: int = 5,
+        target_names: Optional[List[str]]=None,
+        concurrency: int=5,
     ) -> List[RecognitionResult]:
         """
         Batch recognition using concurrent tasks.

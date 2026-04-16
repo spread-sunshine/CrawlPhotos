@@ -2,14 +2,14 @@
 qq:
   # 群相册配置
   group:
-    group_id: ""                      # 班级QQ群号(必填)
+    group_id: "1059031534"                      # 班级QQ群号(必填)
     album_id: ""                       # 目标相册ID(留空则扫描全部)
     cookies_file: "data/qq_cookies.txt"  # QQ登录Cookie文件路径
 
   # 个人相册配置(可选,用于上传筛选后照片)
   personal:
     enabled: false                     # 是否启用自动上传
-    album_prefix: "{year}年{month}月宝宝照片"
+    album_prefix: "{year}.{month}"
     visibility: "self_only"            # self_only / family
 
 # ==================== 人脸识别配置（可插拔） ====================

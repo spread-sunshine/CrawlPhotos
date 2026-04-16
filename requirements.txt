@@ -13,7 +13,9 @@ apscheduler>=3.10,<4.0
 # Image Processing
 Pillow>=10.0,<11.0
 
-# Optional / Future
-# fastapi>=0.100,<1.0
-# uvicorn>=0.24,<1.0
+# Web API Server (Phase 4 - H5 Web UI required)
+fastapi>=0.100,<1.0
+uvicorn[standard]>=0.24,<1.0
+
+# Optional
 # watchdog>=3.0,<4.0

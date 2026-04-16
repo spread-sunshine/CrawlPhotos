@@ -6,6 +6,8 @@ Core infrastructure module.
 Contains:
     - EventBus: Publish-Subscribe event bus
     - Event types: All domain events definitions
+    - Metrics: Structured metrics collection (Counter/Gauge/Histogram)
+    - MetricsEventListener: Auto-collect metrics from EventBus
 """
 
 from app.core.event_bus import EventBus, get_event_bus
@@ -24,6 +26,20 @@ from app.core.events import (
     TargetFoundEvent,
     PhotoStoredEvent,
 )
+from app.core.metrics import (
+    MetricsCollector,
+    MetricsDB,
+    get_metrics,
+    init_metrics,
+)
+from app.core.metrics_listener import MetricsEventListener
+from app.core.review_pool import (
+    DualThresholdConfig,
+    ReviewItem,
+    ReviewPool,
+    ReviewReason,
+    ReviewStatus,
+)
 
 __all__ = [
     "EventBus",
@@ -41,4 +57,14 @@ __all__ = [
     "TargetFoundEvent",
     "PhotoStoredEvent",
     "CookieExpiringEvent",
+    "MetricsCollector",
+    "MetricsDB",
+    "MetricsEventListener",
+    "get_metrics",
+    "init_metrics",
+    "ReviewPool",
+    "ReviewItem",
+    "DualThresholdConfig",
+    "ReviewReason",
+    "ReviewStatus",
 ]

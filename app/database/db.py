@@ -285,8 +285,12 @@ class Database:
 
     # ==================== Run History ====================
 
-    def create_run(self, trigger_type: str) -> TaskRun:
+    def create_run(self, trigger_type) -> "TaskRun":
         """Create a new task run record and return it."""
+        # Accept both TriggerType enum and raw string
+        from app.models.photo import TriggerType
+        if isinstance(trigger_type, str):
+            trigger_type = TriggerType(trigger_type)
         run = TaskRun(
             run_id=str(uuid.uuid4()),
             trigger_type=trigger_type,
