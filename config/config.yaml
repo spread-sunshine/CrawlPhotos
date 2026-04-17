@@ -55,7 +55,7 @@ scheduler:
   startup_scan: true
 source:
   local_directory:
-    path: d:\ugit\Test\CrawlPhotos\output/
+    path: d:\ugit\Test\CrawlPhotos\test_photos/
     recursive: true
   type: local_directory
 storage:

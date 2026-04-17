@@ -746,25 +746,56 @@ def create_app(
     async def browse_directory(
         path: str = Query(default=""),
     ):
-        """Browse local filesystem directories for folder selection."""
-        try:
-            if not path:
-                path = os.getcwd()
-            else:
-                # Security: resolve and validate path stays within bounds
-                resolved = Path(os.path.abspath(path))
-                if not resolved.exists():
-                    raise HTTPException(
-                        404,
-                        detail=f"Path does not exist: {path}",
-                    )
-                if not resolved.is_dir():
-                    raise HTTPException(
-                        400,
-                        detail=f"Not a directory: {path}",
-                    )
+        """Browse local filesystem directories for folder selection.
 
-            target_path = Path(path) if path else Path(os.getcwd())
+        - Empty path -> returns available drive letters (Windows) or root (/)
+        - Drive letter like 'C:' or 'D:' -> lists root of that drive
+        - Regular path -> lists subdirectories of that path.
+        """
+        try:
+            # No path provided -> show drives on Windows, or cwd on other OS
+            if not path:
+                if os.name == 'nt':
+                    import string
+                    drives = []
+                    for letter in string.ascii_uppercase:
+                        drive = f"{letter}:"
+                        if os.path.exists(drive):
+                            drives.append({
+                                "name": f"本地磁盘 ({letter}:)",
+                                "type": "drive",
+                                "path": drive,
+                                "modified_at": "",
+                            })
+                    return ApiResponse(
+                        code=0,
+                        message="success",
+                        data={
+                            "current_path": "",
+                            "parent_path": None,
+                            "entries": drives,
+                        },
+                    )
+                else:
+                    path = os.getcwd()
+
+            target_path = Path(path)
+
+            # Security & validation
+            resolved = Path(os.path.abspath(str(target_path)))
+            if not resolved.exists():
+                raise HTTPException(
+                    404,
+                    detail=f"Path does not exist: {path}",
+                )
+            if not resolved.is_dir():
+                raise HTTPException(
+                    400,
+                    detail=f"Not a directory: {path}",
+                )
+
+            target_path = resolved
+
             entries = []
             for item in sorted(target_path.iterdir()):
                 try:
@@ -783,7 +814,8 @@ def create_app(
 
             parent_path = (
                 str(target_path.parent)
-                if target_path != target_path.parent else None
+                if str(target_path.parent) != str(target_path)
+                else None
             )
 
             return ApiResponse(

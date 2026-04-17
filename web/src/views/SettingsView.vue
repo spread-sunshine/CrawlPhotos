@@ -39,13 +39,30 @@
         header="选择照片目录"
         :confirm-btn="{ content: '选择此目录', theme: 'primary' }"
         cancel-btn="取消"
-        width="520px"
+        width="560px"
         @confirm="confirmDirectory"
       >
+        <!-- Path input bar -->
+        <div class="dir-path-bar">
+          <t-input
+            v-model="pathInputValue"
+            placeholder="输入路径后按回车跳转"
+            @keydown.enter="jumpToPath"
+            clearable
+          />
+          <t-button variant="outline" size="small" @click="jumpToPath">
+            跳转
+          </t-button>
+        </div>
+
         <!-- Breadcrumb navigation -->
         <div class="dir-breadcrumb">
-          <span class="breadcrumb-item clickable" @click="navigateToRoot">
-            根目录
+          <span
+            v-if="currentBrowsePath"
+            class="breadcrumb-item clickable"
+            @click="navigateToRoot"
+          >
+            此电脑
           </span>
           <template v-for="(seg, idx) in pathSegments" :key="idx">
             <span class="breadcrumb-sep">/</span>
@@ -70,6 +87,7 @@
           >
             <FolderIcon size="20px" />
             <span class="entry-name">{{ entry.name }}</span>
+            <span class="entry-type" v-if="entry.type === 'drive'">磁盘</span>
           </div>
         </div>
 
@@ -193,16 +211,17 @@ const loadingDirs = ref(false)
 const currentBrowsePath = ref('')
 const dirEntries = ref([])
 const selectedDirPath = ref('')
+const pathInputValue = ref('')
 
 const pathSegments = computed(() => {
   if (!currentBrowsePath.value) return []
-  // Split path into segments, handling both / and \
   const normalized = currentBrowsePath.value.replace(/\\/g, '/')
-  if (normalized.match(/^[A-Za-z]:$/)) {
+  // Drive letter (e.g. "C:" or "D:") is a single segment
+  if (/^[A-Za-z]:$/.test(normalized)) {
     return [normalized]
   }
+  // Split path into segments
   const parts = normalized.split('/').filter(Boolean)
-  // Preserve drive letter as first segment
   return parts
 })
 
@@ -216,6 +235,7 @@ function selectFolder() {
   selectedDirPath.value = ''
   dirEntries.value = []
   currentBrowsePath.value = ''
+  pathInputValue.value = ''
   dirDialogVisible.value = true
   // Start from the last configured directory (strip trailing slash)
   const startPath = localDirPath.value.replace(/[/\\]+$/, '') || ''
@@ -228,8 +248,9 @@ async function loadDirectory(path) {
     const res = await api.browseDirectory(path)
     const data = res.data || {}
     currentBrowsePath.value = data.current_path || ''
+    pathInputValue.value = data.current_path || ''
     dirEntries.value = (data.entries || [])
-      .filter((e) => e.type === 'directory')
+      .filter((e) => e.type === 'directory' || e.type === 'drive')
       .sort()
   } catch (e) {
     console.error('Failed to browse directory:', e)
@@ -240,12 +261,19 @@ async function loadDirectory(path) {
   }
 }
 
+function jumpToPath() {
+  const target = pathInputValue.value.trim()
+  if (!target) return
+  selectedDirPath.value = ''
+  loadDirectory(target)
+}
+
 function selectDir(entry) {
   selectedDirPath.value = entry.path
 }
 
 function enterDirectory(entry) {
-  if (entry.type === 'directory') {
+  if (entry.type === 'directory' || entry.type === 'drive') {
     selectedDirPath.value = entry.path
     loadDirectory(entry.path)
   }
@@ -478,6 +506,16 @@ onMounted(() => {
 }
 
 /* Directory Browser Dialog */
+.dir-path-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.dir-path-bar .t-input {
+  flex: 1;
+}
+
 .dir-breadcrumb {
   display: flex;
   align-items: center;
@@ -533,6 +571,15 @@ onMounted(() => {
 .entry-name {
   font-size: 14px;
   word-break: break-all;
+}
+
+.entry-type {
+  margin-left: auto;
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.35);
+  background: #f0f0f0;
+  padding: 1px 6px;
+  border-radius: 3px;
 }
 
 .dir-empty {
