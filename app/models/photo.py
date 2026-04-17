@@ -42,6 +42,7 @@ class SourceType(str, Enum):
     """Photo source type."""
     QQ_GROUP_ALBUM = "qq_group_album"
     PERSONAL = "personal"
+    LOCAL_DIR = "local_directory"
 
 
 # ==================== Photo Models ====================

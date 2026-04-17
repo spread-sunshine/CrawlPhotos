@@ -90,4 +90,40 @@ export const api = {
   getMetricsSnapshot() {
     return request('/api/v1/metrics/snapshot')
   },
+
+  // ---- Source Configuration ----
+  getSourceConfig() {
+    return request('/api/v1/source')
+  },
+
+  updateSourceConfig(data) {
+    return request('/api/v1/source', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  },
+
+  // ---- Reference Photos ----
+  listRefPhotos(targetName = 'daughter') {
+    return request(`/api/v1/ref-photos?target_name=${targetName}`)
+  },
+
+  uploadRefPhoto(formData, targetName = 'daughter') {
+    return fetch(`/api/v1/ref-photos/upload-file?target_name=${targetName}`, {
+      method: 'POST',
+      body: formData,
+    }).then((res) => res.json())
+  },
+
+  deleteRefPhoto(filename, targetName = 'daughter') {
+    return request(`/api/v1/ref-photos/${encodeURIComponent(filename)}?target_name=${targetName}`, {
+      method: 'DELETE',
+    })
+  },
+
+  // ---- Directory Browser ----
+  browseDirectory(path = '') {
+    const query = path ? `?path=${encodeURIComponent(path)}` : ''
+    return request(`/api/v1/browse-directory${query}`)
+  },
 }

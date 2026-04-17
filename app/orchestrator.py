@@ -85,7 +85,25 @@ class Orchestrator:
         self._temp_dir = Path("data/temp")
         self._temp_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info("Orchestrator initialized")
+        # Detect source type from crawler class
+        source_type_name = settings.get(
+            "source.type", "qq_group_album"
+        )
+        self._source_type_map = {
+            "qq_group_album": SourceType.QQ_GROUP_ALBUM,
+            "local_directory": SourceType.LOCAL_DIR,
+            "personal": SourceType.PERSONAL,
+        }
+        self._current_source_type = (
+            self._source_type_map.get(
+                source_type_name, SourceType.QQ_GROUP_ALBUM
+            )
+        )
+
+        logger.info(
+            "Orchestrator initialized (source=%s)",
+            source_type_name,
+        )
 
     async def execute(
         self,
@@ -187,6 +205,10 @@ class Orchestrator:
         """
         album_id = self._settings.get("qq.group.album_id", "")
 
+        # For local_directory, use empty album_id (scan all)
+        if self._current_source_type == SourceType.LOCAL_DIR:
+            album_id = ""
+
         # Determine time boundary
         since: Optional[datetime] = None
         days_back = options.get("scan_days_back")
@@ -218,7 +240,7 @@ class Orchestrator:
                 proc = ProcessedPhoto(
                     photo_id=photo.photo_id,
                     status=PhotoStatus.PENDING,
-                    source_type=SourceType.QQ_GROUP_ALBUM,
+                    source_type=self._current_source_type,
                     url=photo.url,
                     created_at=datetime.now(),
                     updated_at=datetime.now(),
@@ -278,7 +300,7 @@ class Orchestrator:
                 proc = ProcessedPhoto(
                     photo_id=photo.photo_id,
                     status=PhotoStatus.DOWNLOADED,
-                    source_type=SourceType.QQ_GROUP_ALBUM,
+                    source_type=self._current_source_type,
                     url=photo.url,
                     local_path=str(temp_path),
                     file_size=temp_path.stat().st_size,

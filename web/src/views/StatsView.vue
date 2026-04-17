@@ -9,7 +9,11 @@
         shadow
         class="summary-card"
       >
-        <div class="sum-value" :style="{ color: item.color }">
+        <div v-if="item.multiLine" class="sum-value multiline" :style="{ color: item.color }">
+          <span class="sum-date">{{ item.value[0] }}</span>
+          <span class="sum-sub">{{ item.value[1] }}</span>
+        </div>
+        <div v-else class="sum-value" :style="{ color: item.color }">
           {{ item.value ?? '-' }}
         </div>
         <div class="sum-label">{{ item.label }}</div>
@@ -91,8 +95,15 @@ const summaryCards = computed(() => [
   { label: '总运行次数', value: stats.value.total_runs, color: '#e37318' },
   {
     label: '最后活动',
-    value: (stats.value.latest_activity || '-').split('T')[0],
+    multiLine: true,
     color: '#7b61ff',
+    value: (() => {
+      const raw = stats.value.latest_activity || ''
+      if (!raw) return ['-', '-']
+      const [date, time] = raw.split('T')
+      const timePart = (time || '').split('.')[0] || '--:--:--'
+      return [date, timePart]
+    })(),
   },
 ])
 
@@ -205,6 +216,23 @@ onMounted(async () => {
 .sum-value {
   font-size: 32px;
   font-weight: bold;
+}
+
+.sum-value.multiline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+}
+
+.sum-date {
+  white-space: nowrap;
+}
+
+.sum-sub {
+  font-size: 18px;
+  font-weight: normal;
+  opacity: 0.8;
 }
 
 .sum-label {

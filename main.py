@@ -33,6 +33,10 @@ from app.database.db import Database
 from app.face_recognition.facade import FaceRecognizerFacade
 from app.face_recognition.models import TargetConfig
 from app.crawler.qq_album_crawler import QQAlbumCrawler
+from app.crawler.local_file_crawler import (
+    LocalFileCrawler,
+    LocalFileConfig,
+)
 from app.preprocessor.image_pipeline import (
     ImagePreprocessor, PreprocessConfig,
 )
@@ -140,14 +144,24 @@ async def create_components(settings: Settings, db: Database):
     if targets:
         await recognizer.initialize(targets)
 
-    # Crawler
-    crawler = QQAlbumCrawler(
-        group_id=settings.require("qq.group.group_id"),
-        cookies_file=settings.get(
-            "qq.group.cookies_file",
-            "data/qq_cookies.txt",
-        ),
-    )
+    # Crawler - select based on source type
+    source_type = settings.get("source.type", "qq_group_album")
+    if source_type == "local_directory":
+        local_cfg = settings.get_section(
+            "source.local_directory"
+        )
+        crawler = LocalFileCrawler(config=LocalFileConfig(
+            source_dir=local_cfg.get("path", "test_photos/"),
+            recursive=local_cfg.get("recursive", True),
+        ))
+    else:
+        crawler = QQAlbumCrawler(
+            group_id=settings.require("qq.group.group_id"),
+            cookies_file=settings.get(
+                "qq.group.cookies_file",
+                "data/qq_cookies.txt",
+            ),
+        )
 
     # Preprocessor
     preprocess_cfg = PreprocessConfig(
@@ -242,8 +256,27 @@ async def cmd_run(args: argparse.Namespace, db: Database) -> None:
         print(f"  Duration:     {run.duration_seconds:.1f}s" if run.duration_seconds else "")
         print(f"{'='*50}\n")
     finally:
-        await crawler.close()
-        await orchestrator._recognizer.cleanup()
+        # Support both async and sync close methods
+        try:
+            close_method = getattr(crawler, "close", None)
+            if close_method:
+                import asyncio
+                if asyncio.iscoroutinefunction(close_method):
+                    await close_method()
+                else:
+                    close_method()
+        except Exception:
+            pass
+        try:
+            cleanup_method = getattr(orchestrator._recognizer, "cleanup", None)
+            if cleanup_method:
+                import asyncio
+                if asyncio.iscoroutinefunction(cleanup_method):
+                    await cleanup_method()
+                else:
+                    cleanup_method()
+        except Exception:
+            pass
 
 
 async def cmd_schedule(args: argparse.Namespace, db: Database) -> None:
@@ -288,8 +321,26 @@ async def cmd_schedule(args: argparse.Namespace, db: Database) -> None:
         await shutdown_event.wait()
     finally:
         scheduled_trigger.stop()
-        await crawler.close()
-        await orchestrator._recognizer.cleanup()
+        try:
+            close_method = getattr(crawler, "close", None)
+            if close_method:
+                import asyncio
+                if asyncio.iscoroutinefunction(close_method):
+                    await close_method()
+                else:
+                    close_method()
+        except Exception:
+            pass
+        try:
+            cleanup_method = getattr(orchestrator._recognizer, "cleanup", None)
+            if cleanup_method:
+                import asyncio
+                if asyncio.iscoroutinefunction(cleanup_method):
+                    await cleanup_method()
+                else:
+                    cleanup_method()
+        except Exception:
+            pass
         logger.info("Shutdown complete.")
 
 

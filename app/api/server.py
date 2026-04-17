@@ -59,6 +59,7 @@ def create_app(
     """
     try:
         from fastapi import FastAPI, HTTPException, Query
+        from fastapi import File as _File, UploadFile
         from fastapi.responses import (
             FileResponse,
             JSONResponse,
@@ -82,6 +83,15 @@ def create_app(
     _db = db
     _orch = orchestrator
 
+    # Global exception handler to log errors
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request, exc):
+        logger.error("Unhandled exception: %s", exc, exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(exc)},
+        )
+
     # ==================== Models ====================
 
     class HealthResponse(BaseModel):
@@ -101,7 +111,7 @@ def create_app(
 
     class PhotoListItem(BaseModel):
         photo_id: str
-        source_photo_id: str = ""
+        source_photo_id: Optional[str] = ""
         upload_time: Optional[str] = None
         local_path: Optional[str] = None
         contains_target: bool = False
@@ -184,7 +194,7 @@ def create_app(
 
         try:
             rows = _db.execute_query_all(
-                "SELECT * FROM pipeline_runs "
+                "SELECT * FROM runs "
                 "ORDER BY started_at DESC LIMIT ?",
                 (limit,),
             )
@@ -200,7 +210,7 @@ def create_app(
 
     # ---- Photo CRUD ----
 
-    @app.get("/api/v1/photos", response_model=ApiResponse)
+    @app.get("/api/v1/photos")
     async def list_photos(
         page: int = Query(1, ge=1),
         page_size: int = Query(20, ge=1, le=100),
@@ -230,13 +240,13 @@ def create_app(
 
         count_row = _db.execute_query_one(
             f"SELECT COUNT(*) AS total "
-            f"FROM photos_record WHERE {where_clause}",
+            f"FROM photos WHERE {where_clause}",
             params,
         )
         total = count_row["total"] if count_row else 0
 
         rows = _db.execute_query_all(
-            f"SELECT * FROM photos_record WHERE {where_clause} "
+            f"SELECT * FROM photos WHERE {where_clause} "
             f"ORDER BY created_at DESC LIMIT ? OFFSET ?",
             params + [page_size, offset],
         )
@@ -244,11 +254,9 @@ def create_app(
         items = []
         for r in rows or []:
             items.append(PhotoListItem(
-                photo_id=r.get("photo_id", ""),
-                source_photo_id=r.get(
-                    "source_photo_id", ""
-                ),
-                upload_time=r.get("upload_time"),
+                photo_id=r.get("photo_id") or "",
+                source_photo_id=r.get("personal_photo_id") or r.get("source_photo_id") or "",
+                upload_time=r.get("created_at"),
                 local_path=r.get("local_path"),
                 contains_target=bool(r.get("contains_target")),
                 confidence=float(r.get("confidence") or 0),
@@ -274,7 +282,7 @@ def create_app(
             raise HTTPException(status_code=503)
 
         row = _db.execute_query_one(
-            "SELECT * FROM photos_record WHERE photo_id=?",
+            "SELECT * FROM photos WHERE photo_id=?",
             (photo_id,),
         )
         if not row:
@@ -295,7 +303,7 @@ def create_app(
             raise HTTPException(status_code=503)
 
         row = _db.execute_query_one(
-            "SELECT local_path, stored_path FROM photos_record WHERE photo_id=?",
+            "SELECT local_path, stored_path FROM photos WHERE photo_id=?",
             (photo_id,),
         )
         if not row:
@@ -359,7 +367,7 @@ def create_app(
                 "COUNT(*) AS count, "
                 "SUM(CASE WHEN contains_target=1 THEN 1 ELSE 0 END) "
                 "AS target_count "
-                "FROM photos_record "
+                "FROM photos "
                 "WHERE created_at >= ? AND created_at < ? "
                 "GROUP BY DATE(created_at) ORDER BY day",
                 (start, end),
@@ -396,17 +404,17 @@ def create_app(
         if _db:
             try:
                 r = _db.execute_query_one(
-                    "SELECT COUNT(*) AS total FROM photos_record",
+                    "SELECT COUNT(*) AS total FROM photos",
                 )
                 stats["total_photos"] = r["total"] if r else 0
 
                 r2 = _db.execute_query_one(
-                    "SELECT COUNT(*) AS cnt FROM photos_record WHERE contains_target=1",
+                    "SELECT COUNT(*) AS cnt FROM photos WHERE contains_target=1",
                 )
                 stats["target_matches"] = r2["cnt"] if r2 else 0
 
                 rows = _db.execute_query_all(
-                    "SELECT status, COUNT(*) AS cnt FROM photos_record GROUP BY status",
+                    "SELECT status, COUNT(*) AS cnt FROM photos GROUP BY status",
                 )
                 stats["by_status"] = {
                     r["status"]: r["cnt"]
@@ -414,7 +422,7 @@ def create_app(
                 }
 
                 r3 = _db.execute_query_one(
-                    "SELECT MAX(created_at) AS latest FROM photos_record",
+                    "SELECT MAX(created_at) AS latest FROM photos",
                 )
                 stats["latest_activity"] = (
                     r3["latest"] if r3 else "never"
@@ -431,7 +439,7 @@ def create_app(
 
                 # Pipeline run stats
                 r4 = _db.execute_query_one(
-                    "SELECT COUNT(*) AS cnt FROM pipeline_runs",
+                    "SELECT COUNT(*) AS cnt FROM runs",
                 )
                 stats["total_runs"] = r4["cnt"] if r4 else 0
 
@@ -580,6 +588,275 @@ def create_app(
             )
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    # ---- Reference Photos Management ----
+
+    REF_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+
+    def _get_ref_photo_dir(target_name: str = "daughter") -> Path:
+        """Resolve reference photo directory from config."""
+        import yaml
+        config_path = Path("config/config.yaml")
+        if not config_path.exists():
+            return Path("config/reference_photos") / target_name
+
+        with open(config_path, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+
+        targets = cfg.get(
+            "face_recognition", {}
+        ).get("targets", [])
+        for t in targets:
+            if t.get("name") == target_name:
+                return Path(t.get(
+                    "reference_photos_dir",
+                    f"config/reference_photos/{target_name}/",
+                ))
+        return Path(f"config/reference_photos/{target_name}/")
+
+    @app.get("/api/v1/ref-photos", response_model=ApiResponse)
+    async def list_reference_photos(
+        target_name: str = Query(default="daughter"),
+    ):
+        """List reference photos for a target person."""
+        ref_dir = _get_ref_photo_dir(target_name)
+        photos = []
+
+        if ref_dir.exists():
+            for p in sorted(ref_dir.iterdir()):
+                if (
+                    p.suffix.lower() in REF_PHOTO_EXTS
+                    and p.is_file()
+                ):
+                    st = p.stat()
+                    photos.append({
+                        "filename": p.name,
+                        "size_bytes": st.st_size,
+                        "modified_at": datetime.fromtimestamp(
+                            st.st_mtime
+                        ).isoformat(),
+                        "url": (
+                            f"/api/v1/ref-photos/"
+                            f"{target_name}/{p.name}"
+                        ),
+                    })
+
+        return ApiResponse(
+            code=0, message="success",
+            data={
+                "target_name": target_name,
+                "directory": str(ref_dir),
+                "total_count": len(photos),
+                "photos": photos,
+            },
+        )
+
+    @app.get(
+        "/api/v1/ref-photos/{target_name}/{filename}"
+    )
+    async def serve_reference_photo_file(
+        target_name: str, filename: str,
+    ):
+        """Serve a reference photo file for preview."""
+        if ".." in filename or "/" in filename or "\\" in filename:
+            raise HTTPException(400, detail="Invalid filename")
+        if ".." in target_name or "/" in target_name or "\\" in target_name:
+            raise HTTPException(400, detail="Invalid target name")
+
+        ref_dir = _get_ref_photo_dir(target_name)
+        file_path = ref_dir / filename
+
+        if not file_path.exists():
+            raise HTTPException(404, detail="Photo not found")
+
+        return FileResponse(
+            str(file_path),
+            media_type=_guess_media_type(file_path),
+        )
+
+    @app.post("/api/v1/ref-photos/upload-file")
+    async def upload_ref_photo_file(
+        target_name: str = Query(default="daughter"),
+        upload: UploadFile = _File(...),
+    ):
+        """Upload reference photo (real multipart handler)."""
+        ref_dir = _get_ref_photo_dir(target_name)
+        ref_dir.mkdir(parents=True, exist_ok=True)
+
+        # Validate extension
+        ext = Path(upload.filename or "file.jpg").suffix.lower()
+        if ext not in REF_PHOTO_EXTS:
+            raise HTTPException(
+                400,
+                detail=f"Unsupported format: {ext}. "
+                       f"Use {REF_PHOTO_EXTS}",
+            )
+
+        # Save file with unique name
+        import uuid as _uid
+        safe_name = f"{_uid.uuid4().hex[:12]}{ext}"
+        dest = ref_dir / safe_name
+
+        content = await upload.read()
+        with open(dest, "wb") as f:
+            f.write(content)
+
+        logger.info(
+            "Ref photo uploaded: %s -> %s",
+            upload.filename, dest,
+        )
+        return ApiResponse(
+            code=0,
+            message="Photo uploaded successfully",
+            data={
+                "filename": safe_name,
+                "original_name": upload.filename,
+                "size_bytes": len(content),
+                "target_name": target_name,
+            },
+        )
+
+    @app.delete("/api/v1/ref-photos/{filename}")
+    async def delete_reference_photo(
+        filename: str,
+        target_name: str = Query(default="daughter"),
+    ):
+        """Delete a reference photo by filename."""
+        # Security: prevent path traversal
+        if ".." in filename or "/" in filename or "\\" in filename:
+            raise HTTPException(400, detail="Invalid filename")
+
+        ref_dir = _get_ref_photo_dir(target_name)
+        file_path = ref_dir / filename
+
+        if not file_path.exists():
+            raise HTTPException(404, detail="Photo not found")
+
+        file_path.unlink()
+        logger.info("Ref photo deleted: %s", filename)
+        return ApiResponse(
+            code=0,
+            message="Photo deleted successfully",
+            data={"filename": filename},
+        )
+
+    # ---- Directory Browser ----
+
+    @app.get("/api/v1/browse-directory", response_model=ApiResponse)
+    async def browse_directory(
+        path: str = Query(default=""),
+    ):
+        """Browse local filesystem directories for folder selection."""
+        try:
+            if not path:
+                path = os.getcwd()
+            else:
+                # Security: resolve and validate path stays within bounds
+                resolved = Path(os.path.abspath(path))
+                if not resolved.exists():
+                    raise HTTPException(
+                        404,
+                        detail=f"Path does not exist: {path}",
+                    )
+                if not resolved.is_dir():
+                    raise HTTPException(
+                        400,
+                        detail=f"Not a directory: {path}",
+                    )
+
+            target_path = Path(path) if path else Path(os.getcwd())
+            entries = []
+            for item in sorted(target_path.iterdir()):
+                try:
+                    is_dir = item.is_dir()
+                    stat = item.stat()
+                    entries.append({
+                        "name": item.name,
+                        "type": "directory" if is_dir else "file",
+                        "path": str(item),
+                        "modified_at": datetime.fromtimestamp(
+                            stat.st_mtime
+                        ).isoformat(),
+                    })
+                except PermissionError:
+                    continue
+
+            parent_path = (
+                str(target_path.parent)
+                if target_path != target_path.parent else None
+            )
+
+            return ApiResponse(
+                code=0,
+                message="success",
+                data={
+                    "current_path": str(target_path),
+                    "parent_path": parent_path,
+                    "entries": entries,
+                },
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # ---- Source Configuration API ----
+
+    @app.get("/api/v1/source", response_model=ApiResponse)
+    async def get_source_config():
+        """Get current data source configuration."""
+        import yaml
+        config_path = Path("config/config.yaml")
+        cfg_data: Dict[str, Any] = {}
+
+        if config_path.exists():
+            with open(config_path, encoding="utf-8") as f:
+                raw = yaml.safe_load(f) or {}
+            src = raw.get("source", {})
+            cfg_data["type"] = src.get("type", "qq_group_album")
+            cfg_data["local_directory"] = src.get(
+                "local_directory", {}
+            )
+
+        return ApiResponse(
+            code=0, message="success", data=cfg_data,
+        )
+
+    @app.put("/api/v1/source", response_model=ApiResponse)
+    async def update_source_config(req_body: Dict[str, Any]):
+        """Update data source configuration."""
+        import yaml
+        config_path = Path("config/config.yaml")
+
+        if not config_path.exists():
+            raise HTTPException(404, detail="Config file not found")
+
+        with open(config_path, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+
+        if "source" not in cfg:
+            cfg["source"] = {}
+
+        new_type = req_body.get("type")
+        if new_type in ("qq_group_album", "local_directory"):
+            cfg["source"]["type"] = new_type
+
+        local_cfg = req_body.get("local_directory")
+        if isinstance(local_cfg, dict):
+            if "local_directory" not in cfg["source"]:
+                cfg["source"]["local_directory"] = {}
+            cfg["source"]["local_directory"].update(local_cfg)
+
+        with open(config_path, "w", encoding="utf-8") as f:
+            yaml.dump(cfg, f, allow_unicode=True,
+                      default_flow_style=False)
+
+        logger.info("Source config updated: %s", req_body)
+        return ApiResponse(
+            code=0,
+            message="Configuration updated (restart required)",
+            data=cfg.get("source", {}),
+        )
 
     return app
 

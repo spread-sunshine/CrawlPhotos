@@ -117,6 +117,20 @@ class Database:
             self._conn.close()
             self._conn = None
 
+    # ==================== General Query ====================
+
+    def execute_query_one(self, sql: str, params: tuple = ()) -> Optional[dict]:
+        """Execute a SELECT query and return one row as dict."""
+        row = self.conn.execute(sql, params).fetchone()
+        return dict(row) if row else None
+
+    def execute_query_all(
+        self, sql: str, params: tuple = (),
+    ) -> list[dict]:
+        """Execute a SELECT query and return all rows as dicts."""
+        rows = self.conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
     # ==================== Photo CRUD ====================
 
     def insert_photo(self, photo: ProcessedPhoto) -> bool:

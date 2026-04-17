@@ -1,89 +1,65 @@
-# ==================== QQ群相册配置 ====================
-qq:
-  # 群相册配置
-  group:
-    group_id: "1059031534"                      # 班级QQ群号(必填)
-    album_id: ""                       # 目标相册ID(留空则扫描全部)
-    cookies_file: "data/qq_cookies.txt"  # QQ登录Cookie文件路径
-
-  # 个人相册配置(可选,用于上传筛选后照片)
-  personal:
-    enabled: false                     # 是否启用自动上传
-    album_prefix: "{year}.{month}"
-    visibility: "self_only"            # self_only / family
-
-# ==================== 人脸识别配置（可插拔） ====================
 face_recognition:
-  # 核心切换开关: 只需改这一行即可更换提供商
-  provider: "tencent_cloud"
-  # 可选值:
-  #   "tencent_cloud"     - 腾讯云人脸识别 (推荐,准确率99%+,1000次/月免费)
-  #   "baidu"             - 百度AI人脸识别 (免费额度大,QPS限制内免费)
-  #   "insight_face_local"- InsightFace本地模型 (完全离线,无网络依赖)
-
-  # 提供商A: 腾讯云
-  tencent_cloud:
-    secret_id: "${TENCENT_SECRET_ID}"
-    secret_key: "${TENCENT_SECRET_KEY}"
-    region: "ap-guangzhou"
-    group_id: "baby_photos_group"
-
-  # 提供商B: 百度AI
   baidu:
-    app_id: "${BAIDU_APP_ID}"
-    api_key: "${BAIDU_API_KEY}"
-    secret_key: "${BAIDU_SECRET_KEY}"
-    group_id: "baby_photos_group"
-
-  # 提供商C: InsightFace 本地模型(离线)
+    api_key: ${BAIDU_API_KEY}
+    app_id: ${BAIDU_APP_ID}
+    group_id: baby_photos_group
+    secret_key: ${BAIDU_SECRET_KEY}
   insight_face_local:
-    model_name: "buffalo_l"
-    device: "cpu"
-    model_cache_dir: "data/models"
-    confidence_threshold: 0.80
+    confidence_threshold: 0.8
+    device: cpu
+    model_cache_dir: data/models
+    model_name: buffalo_l
     use_faiss: false
-
-  # 目标人物配置(所有提供商共用)
+  provider: insight_face_local
   targets:
-    - name: "宝贝女儿"
-      reference_photos_dir: "config/reference_photos/daughter/"
-      min_confidence: 0.80
-      enabled: true
-
-# ==================== 存储配置 ====================
-storage:
-  root_directory: "./output"           # 照片存储根目录
-  directory_format: "{root}/{year}/{month_num}_{month_name}/{date}"
-  filename_format: "{date}_{seq:04d}_qqgroup.{ext}"
-  retain_original_filename: true
-
-# ==================== 调度配置 ====================
-scheduler:
-  cron_expression: "0 */30 * * * *"   # 每30分钟执行一次
-  startup_scan: true                  # 启动时全量扫描一次
-  scan_days_back: 7                   # 启动回溯天数
-
-# ==================== 日志配置 ====================
+  - enabled: true
+    min_confidence: 0.8
+    name: 宝贝女儿
+    reference_photos_dir: config/reference_photos/daughter/
+  tencent_cloud:
+    group_id: baby_photos_group
+    region: ap-guangzhou
+    secret_id: ${TENCENT_SECRET_ID}
+    secret_key: ${TENCENT_SECRET_KEY}
 logging:
-  level: "INFO"                       # DEBUG / INFO / WARN / ERROR
-  directory: "logs"
+  directory: logs
+  level: INFO
   max_file_size_mb: 50
   retention_days: 90
-
-# ==================== 通知配置(可选) ====================
 notification:
-  enabled: false
-  type: "wechat"
-  wechat:
-    # WeChat Official Account (MP) credentials
-    app_id: "${WECHAT_APP_ID}"           # 公众号AppID
-    app_secret: "${WECHAT_APP_SECRET}"   # 公众号AppSecret
-    # Template message IDs (from MP admin console)
-    template_id_new_photo: ""            # 新照片发现模板消息ID
-    template_id_error: ""                # 异常告警模板消息ID
-    template_id_summary: ""              # 每日汇总报告模板消息ID
-    receiver_openid: ""                  # 接收者OpenID
-  notify_on_new_photo: true
-  notify_on_error: true
   daily_summary: true
-  summary_time: "21:00"
+  enabled: false
+  notify_on_error: true
+  notify_on_new_photo: true
+  summary_time: '21:00'
+  type: wechat
+  wechat:
+    app_id: ${WECHAT_APP_ID}
+    app_secret: ${WECHAT_APP_SECRET}
+    receiver_openid: ''
+    template_id_error: ''
+    template_id_new_photo: ''
+    template_id_summary: ''
+qq:
+  group:
+    album_id: ''
+    cookies_file: data/qq_cookies.txt
+    group_id: '1059031534'
+  personal:
+    album_prefix: '{year}.{month}'
+    enabled: false
+    visibility: self_only
+scheduler:
+  cron_expression: 0 */30 * * * *
+  scan_days_back: 7
+  startup_scan: true
+source:
+  local_directory:
+    path: d:\ugit\Test\CrawlPhotos\output/
+    recursive: true
+  type: local_directory
+storage:
+  directory_format: '{root}/{year}/{month_num}_{month_name}/{date}'
+  filename_format: '{date}_{seq:04d}_qqgroup.{ext}'
+  retain_original_filename: true
+  root_directory: ./output

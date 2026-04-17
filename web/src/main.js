@@ -7,12 +7,14 @@ import HomeView from './views/HomeView.vue'
 import CalendarView from './views/CalendarView.vue'
 import StatsView from './views/StatsView.vue'
 import ReviewView from './views/ReviewView.vue'
+import SettingsView from './views/SettingsView.vue'
 
 const routes = [
   { path: '/', name: 'home', component: HomeView },
   { path: '/calendar', name: 'calendar', component: CalendarView },
   { path: '/stats', name: 'stats', component: StatsView },
   { path: '/review', name: 'review', component: ReviewView },
+  { path: '/settings', name: 'settings', component: SettingsView },
 ]
 
 const router = createRouter({
