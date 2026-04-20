@@ -160,6 +160,7 @@ import { ref, computed, onMounted } from 'vue'
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
 import { UploadIcon, FolderIcon } from 'tdesign-icons-vue-next'
 import { api } from '../api'
+import { eventBus } from '../main'
 
 const sourceType = ref('local_directory')
 const localDirPath = ref('test_photos/')
@@ -194,7 +195,12 @@ async function saveSourceConfig() {
         recursive: localRecursive.value,
       },
     })
-    MessagePlugin.success('配置已保存，重启后生效')
+    MessagePlugin.success('配置已保存，正在扫描新目录...')
+    // Notify other views to refresh data
+    eventBus.emit('source-config-changed', {
+      type: sourceType.value,
+      path: localDirPath.value,
+    })
   } catch (e) {
     MessagePlugin.error('保存失败: ' + e.message)
   } finally {

@@ -92,10 +92,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { PlayCircleIcon } from 'tdesign-icons-vue-next'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { api } from '../api'
+import { eventBus } from '../main'
 
 const photos = ref([])
 const stats = ref({})
@@ -179,13 +180,40 @@ watch(targetOnly, () => {
   loadPhotos()
 })
 
+let unsubSourceChanged = null
+
+function handleSourceConfigChanged(config) {
+  console.log('[HomeView] Source config changed:', config)
+  // Reset page and reload all data
+  currentPage.value = 1
+  Promise.all([
+    loadHealth(),
+    loadStats(),
+    loadReviewSummary(),
+    loadPhotos(),
+  ])
+}
+
 onMounted(async () => {
+  // Listen for source config changes from settings page
+  unsubSourceChanged = eventBus.on(
+    'source-config-changed',
+    handleSourceConfigChanged,
+  )
+
   await Promise.all([
     loadHealth(),
     loadStats(),
     loadReviewSummary(),
     loadPhotos(),
   ])
+})
+
+onUnmounted(() => {
+  if (unsubSourceChanged) {
+    unsubSourceChanged()
+    unsubSourceChanged = null
+  }
 })
 </script>
 

@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional
 
 from app.config.logging_config import get_logger
 from app.database.db import Database
+from app.models.photo import TriggerType
 
 logger = get_logger(__name__)
 
@@ -884,20 +885,53 @@ def create_app(
                       default_flow_style=False)
 
         logger.info("Source config updated: %s", req_body)
+
+        # Trigger a background scan with updated config
+        if _orch:
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(_run_orchestrator_async(req_body))
+                logger.info("Background scan triggered after source config update")
+            except RuntimeError:
+                logger.warning(
+                    "No event loop available, "
+                    "scan not auto-triggered. Use manual trigger."
+                )
+        else:
+            logger.warning(
+                "Orchestrator not configured, "
+                "auto-scan skipped after config update"
+            )
+
         return ApiResponse(
             code=0,
-            message="Configuration updated (restart required)",
+            message="Configuration updated, scan triggered",
             data=cfg.get("source", {}),
         )
 
     return app
 
 
-async def _run_orchestrator_async(options: Dict[str, Any]) -> None:
+async def _run_orchestrator_async(
+    options: Optional[Dict[str, Any]] = None,
+) -> None:
     """Background runner for orchestrator tasks."""
-    logger.info(
-        "Background task started with options: %s", options
-    )
+    import traceback
+
+    if not _orch:
+        logger.error("Cannot run pipeline: Orchestrator not configured")
+        return
+
+    try:
+        trigger_type = TriggerType.MANUAL
+        logger.info("Pipeline starting with trigger=%s", trigger_type.value)
+        run = await _orch.execute(trigger_type=trigger_type, options=options)
+        logger.info("Pipeline completed: run_id=%s",
+                     run.run_id)
+    except Exception as e:
+        logger.error("Pipeline failed: %s\n%s", e,
+                      traceback.format_exc())
 
 
 def _guess_media_type(path: Path) -> str:
