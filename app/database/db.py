@@ -19,6 +19,7 @@ from app.models.photo import (
 
 # Default database path
 DEFAULT_DB_PATH = Path("data") / "crawl_photos.db"
+DEFAULT_READ_CHUNK_SIZE = 8192
 
 # SQL Schema definitions
 SQL_CREATE_PHOTOS_TABLE = """
@@ -245,7 +246,7 @@ class Database:
         row = self.conn.execute(
             "SELECT retry_count FROM photos WHERE photo_id = ?",
             (photo_id,),
-        ).fetchone
+        ).fetchone()
         return row["retry_count"] if row else 0
 
     def list_photos_by_status(
@@ -369,7 +370,7 @@ class Database:
         """Compute SHA256 hash of a file."""
         sha256 = hashlib.sha256()
         with open(file_path, "rb") as f:
-            for chunk in iter(lambda: f.read(8192), b""):
+            for chunk in iter(lambda: f.read(DEFAULT_READ_CHUNK_SIZE), b""):
                 sha256.update(chunk)
         return sha256.hexdigest()
 

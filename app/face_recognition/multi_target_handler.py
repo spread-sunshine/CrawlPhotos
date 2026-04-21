@@ -133,9 +133,9 @@ class MultiTargetHandler:
             return result
 
         active_targets = [
-            t for t in self.targets.values() if t["enabled"]
+            t for t in self._targets.values() if t["enabled"]
         ]
-        
+
         # Run recognition concurrently for each target
         coros = []
         for name, cfg in self._targets.items():
@@ -222,18 +222,19 @@ class MultiTargetHandler:
             rec_result: RecognitionResult = (
                 await self._recognizer.recognize(str(image_path))
             )
-            is_match = rec_result.is_match
-            conf = rec_result.confidence or 0.0
-            
+            is_match = rec_result.contains_target
+            conf = rec_result.best_confidence
+
             # Apply per-target min_confidence override
             effective_threshold = min_confidence
             if is_match and conf < effective_threshold:
                 is_match = False
 
             bbox_tuple = None
-            if rec_result.bounding_box:
-                bb = rec_result.bounding_box
-                bbox_tuple = (bb.left, bb.top, bb.width, bb.height)
+            if rec_result.all_face_detections:
+                fd = rec_result.all_face_detections[0]
+                bb = fd.bounding_box
+                bbox_tuple = (bb.x, bb.y, bb.width, bb.height)
 
             return TargetMatch(
                 target_name=target_name,
@@ -262,8 +263,7 @@ def create_multi_target_handler(
     fr_cfg = config.get("face_recognition", {})
     targets = fr_cfg.get("targets", [])
     default_conf = 0.80
-    
-    # Check for global default
+# Check for global default
     for t in targets:
         if t.get("min_confidence"):
             default_conf = t["min_confidence"]

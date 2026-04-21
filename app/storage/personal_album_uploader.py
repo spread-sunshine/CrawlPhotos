@@ -104,7 +104,7 @@ class PersonalAlbumUploader:
             max_retries=max_retries,
             base_delay=2.0,
             max_delay=30.0,
-            jitter=True,
+            jitter_factor=0.5,
         )
         # Cache: month_key -> album_id
         self._album_cache: Dict[str, str] = {}

@@ -23,7 +23,6 @@ Architecture:
 
 import asyncio
 import functools
-import logging
 import time
 from collections import deque
 from dataclasses import dataclass, field

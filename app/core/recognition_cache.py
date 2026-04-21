@@ -40,7 +40,12 @@ class CachedRecognition:
     bbox_width: int = 0
     bbox_height: int = 0
     cached_at: float = 0.0   # Unix timestamp
-    ttl_seconds: float = 3600.0  # Default 1 hour
+    ttl_seconds: float = 3600.0
+
+
+# Cache constants
+DEFAULT_CACHE_TTL_SECONDS = 3600.0  # Default 1 hour
+IO_BUFFER_SIZE = 65536
 
 
 class RecognitionCache:
@@ -131,7 +136,7 @@ class RecognitionCache:
     def compute_key(image_path: Path) -> str:
         """Compute SHA256 hash of image file as cache key."""
         sha = hashlib.sha256()
-        buf_size = 65536
+        buf_size = IO_BUFFER_SIZE
         with open(image_path, "rb") as f:
             while True:
                 chunk = f.read(buf_size)

@@ -54,6 +54,10 @@ from app.crawler.qq_album_crawler import QQAlbumCrawler, CrawlResult
 
 logger = get_logger(__name__)
 
+# Pipeline constants
+DOWNLOAD_CONCURRENCY = 5
+TEMP_DIR_PATH = Path("data/temp")
+
 
 class Orchestrator:
     """
@@ -82,7 +86,7 @@ class Orchestrator:
         self._crawler = crawler
         self._preprocessor = preprocessor
         self._storage = storage_manager
-        self._temp_dir = Path("data/temp")
+        self._temp_dir = TEMP_DIR_PATH
         self._temp_dir.mkdir(parents=True, exist_ok=True)
 
         # Detect source type from crawler class
@@ -262,7 +266,7 @@ class Orchestrator:
         """
         downloaded: List[ProcessedPhoto] = []
 
-        sem = asyncio.Semaphore(5)  # Concurrency limit
+        sem = asyncio.Semaphore(DOWNLOAD_CONCURRENCY)
 
         async def _download_one(photo: PhotoInfo) -> Optional[ProcessedPhoto]:
             async with sem:

@@ -22,18 +22,49 @@ Security note:
 """
 
 import asyncio
+import io
 import os
 import shutil
+import string
+import traceback
+import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import yaml
+
 from app.config.logging_config import get_logger
 from app.database.db import Database
 from app.models.photo import TriggerType
 
+# Optional dependencies
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
+try:
+    from fastapi import FastAPI, HTTPException, Query
+    from fastapi import File as _File, UploadFile
+    from fastapi.responses import (
+        FileResponse,
+        JSONResponse,
+        Response,
+    )
+    from pydantic import BaseModel
+except ImportError:
+    FastAPI = None
+
 logger = get_logger(__name__)
+
+# ==================== Constants ====================
+
+THUMBNAIL_SIZE = (400, 400)
+THUMBNAIL_QUALITY = 75
+REF_PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+CONFIG_PATH = Path("config/config.yaml")
 
 
 @asynccontextmanager
@@ -46,28 +77,19 @@ async def _lifespan(app):  # type: ignore
 
 def create_app(
     db: Optional[Database] = None,
-    orchestrator=None,
-) -> Any:
+    orchestrator: Any = None,
+) -> Optional[Any]:
     """
     Create and configure FastAPI application instance.
 
     Args:
         db: Database instance for data access.
         orchestrator: Orchestrator instance for triggering runs.
-    
+
     Returns:
         Configured FastAPI app (or None if fastapi not installed).
     """
-    try:
-        from fastapi import FastAPI, HTTPException, Query
-        from fastapi import File as _File, UploadFile
-        from fastapi.responses import (
-            FileResponse,
-            JSONResponse,
-            Response,
-        )
-        from pydantic import BaseModel
-    except ImportError:
+    if FastAPI is None:
         logger.warning(
             "FastAPI not installed. Install with: "
             "pip install fastapi uvicorn"
@@ -228,7 +250,7 @@ def create_app(
 
         offset = (page - 1) * page_size
         where_parts = []
-        params: list = []
+        params: List[Any] = []
 
         if target_only:
             where_parts.append("contains_target = 1")
@@ -332,16 +354,18 @@ def create_app(
 
         if size == "thumb":
             # Return a small thumbnail using PIL
-            from PIL import Image
-            import io
+            if Image is None:
+                raise HTTPException(
+                    500, detail="PIL not installed"
+                )
 
             img = Image.open(file_path)
-            img.thumbnail((400, 400), Image.LANCZOS)
+            img.thumbnail(THUMBNAIL_SIZE, Image.LANCZOS)
 
             buf = io.BytesIO()
             ext = file_path.suffix.lower()
             fmt = "JPEG" if ext in (".jpg", ".jpeg") else "PNG"
-            img.save(buf, format=fmt, quality=75)
+            img.save(buf, format=fmt, quality=THUMBNAIL_QUALITY)
 
             buf.seek(0)
             media = (
@@ -600,12 +624,10 @@ def create_app(
 
     def _get_ref_photo_dir(target_name: str = "daughter") -> Path:
         """Resolve reference photo directory from config."""
-        import yaml
-        config_path = Path("config/config.yaml")
-        if not config_path.exists():
+        if not CONFIG_PATH.exists():
             return Path("config/reference_photos") / target_name
 
-        with open(config_path, encoding="utf-8") as f:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
             cfg = yaml.safe_load(f) or {}
 
         targets = cfg.get(
@@ -698,8 +720,7 @@ def create_app(
             )
 
         # Save file with unique name
-        import uuid as _uid
-        safe_name = f"{_uid.uuid4().hex[:12]}{ext}"
+        safe_name = f"{uuid.uuid4().hex[:12]}{ext}"
         dest = ref_dir / safe_name
 
         content = await upload.read()
@@ -761,7 +782,6 @@ def create_app(
             # No path provided -> show drives on Windows, or cwd on other OS
             if not path:
                 if os.name == 'nt':
-                    import string
                     drives = []
                     for letter in string.ascii_uppercase:
                         drive = f"{letter}:"
@@ -842,8 +862,7 @@ def create_app(
     @app.get("/api/v1/source", response_model=ApiResponse)
     async def get_source_config():
         """Get current data source configuration."""
-        import yaml
-        config_path = Path("config/config.yaml")
+        config_path = CONFIG_PATH
         cfg_data: Dict[str, Any] = {}
 
         if config_path.exists():
@@ -862,8 +881,7 @@ def create_app(
     @app.put("/api/v1/source", response_model=ApiResponse)
     async def update_source_config(req_body: Dict[str, Any]):
         """Update data source configuration."""
-        import yaml
-        config_path = Path("config/config.yaml")
+        config_path = CONFIG_PATH
 
         if not config_path.exists():
             raise HTTPException(404, detail="Config file not found")
@@ -892,7 +910,6 @@ def create_app(
 
         # Trigger a background scan with updated config
         if _orch:
-            import asyncio
             try:
                 loop = asyncio.get_running_loop()
                 loop.create_task(_run_orchestrator_async(req_body))
@@ -921,8 +938,6 @@ async def _run_orchestrator_async(
     options: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Background runner for orchestrator tasks."""
-    import traceback
-
     if not _orch:
         logger.error("Cannot run pipeline: Orchestrator not configured")
         return
@@ -952,12 +967,11 @@ def _guess_media_type(path: Path) -> str:
 
 def start_api_server(
     host: str = "127.0.0.1",
-    port: int = 8080,
+    port: int = 8000,
     db: Optional[Database] = None,
-    orchestrator=None,
+    orchestrator: Any = None,
 ) -> None:
-    """
-    Start the FastAPI server (blocking).
+    """Start the FastAPI server (blocking).
 
     Should be called in a separate thread or process.
     """

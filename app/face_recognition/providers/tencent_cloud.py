@@ -26,6 +26,8 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
+from app.config.logging_config import get_logger
+
 from app.face_recognition.exceptions import (
     ImageInvalidError,
     ProviderApiError,
@@ -43,7 +45,7 @@ from app.face_recognition.models import (
     TargetConfig,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 try:
     from tencentcloud.common import credential
@@ -72,10 +74,10 @@ class TencentCloudProvider(IFaceRecognizer):
 
     def __init__(
         self,
-        secret_id: str="",
-        secret_key: str="",
-        region: str="ap-guangzhou",
-        group_id: str="baby_photos_group",
+        secret_id: str = "",
+        secret_key: str = "",
+        region: str = "ap-guangzhou",
+        group_id: str = "baby_photos_group",
         **kwargs: Any,
     ) -> None:
         if not TENCENT_SDK_AVAILABLE:
@@ -272,7 +274,7 @@ class TencentCloudProvider(IFaceRecognizer):
     async def detect_faces(
         self,
         image_path: str,
-        max_faces: int=10,
+        max_faces: int = 10,
     ) -> List[FaceDetection]:
         """Detect all faces in an image."""
         img_base64 = self._encode_image(image_path)
@@ -317,7 +319,7 @@ class TencentCloudProvider(IFaceRecognizer):
     async def recognize(
         self,
         image_path: str,
-        target_names: Optional[List[str]]=None,
+        target_names: Optional[List[str]] = None,
     ) -> RecognitionResult:
         """
         Detect faces and search for target matches.
@@ -610,8 +612,8 @@ class TencentCloudProvider(IFaceRecognizer):
     async def batch_recognize(
         self,
         image_paths: List[str],
-        target_names: Optional[List[str]]=None,
-        concurrency: int=5,
+        target_names: Optional[List[str]] = None,
+        concurrency: int = 5,
     ) -> List[RecognitionResult]:
         """
         Batch recognition using concurrent tasks.
