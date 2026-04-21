@@ -217,6 +217,7 @@ def create_app(
         page_size: int = Query(20, ge=1, le=100),
         target_only: bool = Query(False),
         status_filter: Optional[str] = Query(None),
+        min_confidence: Optional[float] = Query(None, ge=0.0, le=1.0),
     ):
         """List photos with pagination and filtering."""
         if not _db:
@@ -234,6 +235,9 @@ def create_app(
         if status_filter:
             where_parts.append("status = ?")
             params.append(status_filter)
+        if min_confidence is not None:
+            where_parts.append("confidence >= ?")
+            params.append(min_confidence)
 
         where_clause = (
             (" AND ".join(where_parts)) if where_parts else "1=1"

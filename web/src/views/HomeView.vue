@@ -29,6 +29,7 @@
         <PlayCircleIcon /> 立即筛选
       </t-button>
       <t-checkbox v-model="targetOnly">仅显示目标照片</t-checkbox>
+      <span class="confidence-label">置信度 >= {{ (minConfidence * 100).toFixed(0) }}%</span>
     </div>
 
     <!-- Photo waterfall grid -->
@@ -105,8 +106,11 @@ const loading = ref(false)
 const triggering = ref(false)
 const isHealthy = ref(false)
 const targetOnly = ref(false)
+const minConfidence = ref(
+  parseFloat(localStorage.getItem('crawlphotos_min_confidence') || '0.80')
+)
 const currentPage = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(100)
 const total = ref(0)
 const previewVisible = ref(false)
 const previewPhoto = ref(null)
@@ -144,6 +148,7 @@ async function loadPhotos() {
     const params = {
       page: currentPage.value,
       page_size: pageSize.value,
+      min_confidence: minConfidence.value,
     }
     if (targetOnly.value) params.target_only = true
 
@@ -184,7 +189,6 @@ let unsubSourceChanged = null
 
 function handleSourceConfigChanged(config) {
   console.log('[HomeView] Source config changed:', config)
-  // Reset page and reload all data
   currentPage.value = 1
   Promise.all([
     loadHealth(),
@@ -194,12 +198,19 @@ function handleSourceConfigChanged(config) {
   ])
 }
 
+function handleConfidenceChanged(val) {
+  minConfidence.value = val
+  currentPage.value = 1
+  loadPhotos()
+}
+
 onMounted(async () => {
   // Listen for source config changes from settings page
   unsubSourceChanged = eventBus.on(
     'source-config-changed',
     handleSourceConfigChanged,
   )
+  eventBus.on('confidence-changed', handleConfidenceChanged)
 
   await Promise.all([
     loadHealth(),
@@ -254,6 +265,15 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   margin-bottom: 20px;
+}
+
+.confidence-label {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.6);
+  padding: 4px 10px;
+  background: #f0f5ff;
+  border-radius: 4px;
+  white-space: nowrap;
 }
 
 .photo-grid {

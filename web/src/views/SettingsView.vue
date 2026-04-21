@@ -109,6 +109,35 @@
       </div>
     </t-card>
 
+    <!-- Recognition Confidence Section -->
+    <t-card title="识别筛选设置" bordered :shadow="true" class="section-card">
+      <p class="hint-text">设置人脸识别的置信度阈值，低于此值的照片将被过滤。</p>
+
+      <div class="form-row">
+        <label>最低置信度：</label>
+        <div class="confidence-input-group">
+          <t-slider
+            v-model="minConfidence"
+            :min="0"
+            :max="1"
+            :step="0.05"
+            :marks="{ 0: '0%', 0.5: '50%', 0.8: '80%', 1: '100%' }"
+            style="flex: 1; min-width: 0"
+          />
+          <t-input-number
+            v-model="minConfidence"
+            :min="0"
+            :max="1"
+            :step="0.05"
+            :precision="2"
+            style="width: 90px"
+          />
+        </div>
+      </div>
+      <p class="hint-text" v-if="minConfidence > 0.8">高阈值（>{{ (minConfidence * 100).toFixed(0) }}%）会减少误报但可能漏掉部分目标照片</p>
+      <p class="hint-text" v-else-if="minConfidence < 0.6">低阈值（<{{ (minConfidence * 100).toFixed(0) }}%）会增加匹配数量但也可能引入更多非目标照片</p>
+    </t-card>
+
     <!-- Reference Photos Section -->
     <t-card title="参考照片（目标人物）" bordered :shadow="true" class="section-card">
       <p class="hint-text">上传目标人物的正面清晰照片，用于人脸识别匹配。</p>
@@ -170,6 +199,12 @@ const refPhotos = ref([])
 const loadingRefs = ref(true)
 const fileInput = ref(null)
 const dirInput = ref(null)
+
+// Confidence threshold (persisted to localStorage)
+const CONFIDENCE_KEY = 'crawlphotos_min_confidence'
+const minConfidence = ref(
+  parseFloat(localStorage.getItem(CONFIDENCE_KEY) || '0.80')
+)
 
 async function loadSourceConfig() {
   try {
@@ -400,6 +435,13 @@ onMounted(() => {
   loadSourceConfig()
   loadRefPhotos()
 })
+
+// Watch confidence changes: persist + notify HomeView
+import { watch as vueWatch } from 'vue'
+vueWatch(minConfidence, (val) => {
+  localStorage.setItem(CONFIDENCE_KEY, String(val))
+  eventBus.emit('confidence-changed', val)
+})
 </script>
 
 <style scoped>
@@ -455,6 +497,18 @@ onMounted(() => {
 .action-row {
   margin-top: 16px;
   text-align: right;
+}
+
+.confidence-input-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.confidence-input-group .t-slider {
+  flex: 1;
 }
 
 .upload-area {
