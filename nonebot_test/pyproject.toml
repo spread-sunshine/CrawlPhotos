@@ -1,0 +1,10 @@
+[project]
+name = "nonebot-qq-album-collector"
+version = "0.1.0"
+description = "QQ群相册照片收集机器人"
+requires-python = ">=3.12"
+
+[tool.nonebot]
+adapters = [{ name = "onebot11", module = "nonebot.adapters.onebot" }]
+
+[tool.nonebot.adapter.onebot]
